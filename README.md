@@ -1,4 +1,4 @@
-# 沙箱场 · zmzai cloud
+# Sandbox · zmzai.cloud
 
 `z.zmzai.cloud` 是 ZMZ AI 的受限代码执行层。
 

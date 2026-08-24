@@ -159,7 +159,7 @@ export function SandboxConsole() {
           </>
         }
       >
-        <h1 className="text-sm font-semibold">沙箱场</h1>
+        <h1 className="text-sm font-semibold">Sandbox</h1>
       </Navbar>
 
       <section className="console-intro">
@@ -194,7 +194,7 @@ export function SandboxConsole() {
         </article>
       </section>
 
-      <footer className="console-footer"><span>沙箱场 · ZMZAI OS execution layer</span><span>OpenSandbox adapter · Docker runtime</span></footer>
+      <footer className="console-footer"><span>Sandbox · ZMZAI OS execution layer</span><span>OpenSandbox adapter · Docker runtime</span></footer>
     </main>
   );
 }

@@ -2,7 +2,7 @@
   "name": "zmzai-sandbox",
   "version": "0.1.0",
   "private": true,
-  "description": "沙箱场 — 代码执行与 Agent 实验的沙箱 · zmzai cloud 子产品",
+  "description": "Sandbox — 代码执行与 Agent 实验的沙箱 · zmzai.cloud 子产品",
   "license": "Apache-2.0",
   "scripts": {
     "dev": "next dev",
