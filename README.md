@@ -66,4 +66,4 @@ pnpm test
 
 完整部署和排错步骤见 [自建 OpenSandbox](docs/how-to/self-host-opensandbox.md)。
 
-Apache-2.0 · 牧之
+Apache-2.0 · 知末智云
