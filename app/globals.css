@@ -1,78 +1,15 @@
 @import "tailwindcss";
+@import "@zmzai/theme/tokens";
+@import "@zmzai/theme/fonts";
 @source "../node_modules/@zmzai/theme/src/**/*.{ts,tsx}";
 
-/* zmzai cloud 牧之 — tokens.css is the source of truth.
-   Locked via Hallmark Study; see design.md. Warm paper, warm ink,
-   seal-red accent. No Geist, no acid green, no centered AI slop. */
+/* zmzai cloud 牧之 — tokens 统一来自 @zmzai/theme（v0.6.0 起纯白+荧光绿，
+   与 zmzai.cloud 主应用同源），不再内联。仅保留 app 特有 token。 */
 
 @theme {
-  /* Color — map tokens to Tailwind utilities so components use
-     bg-paper / text-ink / text-accent instead of bg-[var(...)]. */
-  --color-paper: oklch(0.995 0.002 90);
-  --color-surface: oklch(0.98 0.004 90);
-  --color-surface-strong: oklch(0.95 0.006 88);
-  --color-ink: oklch(0.15 0.010 30);
-  --color-muted: oklch(0.50 0.012 55);
-  --color-line: oklch(0.90 0.005 88);
-  --color-rule: oklch(0.15 0.010 30);
-  --color-accent: oklch(0.78 0.220 142);
-  --color-accent-strong: oklch(0.68 0.220 142);
-  --color-accent-ink: oklch(0.15 0.010 30);
-  --color-success: oklch(0.72 0.180 145);
-  --color-bg: oklch(0.995 0.002 90);
-  --color-ink-2: oklch(0.50 0.012 55);
-  --color-ink-3: oklch(0.55 0.012 55);
-  --color-surface-2: oklch(0.95 0.006 88);
-  --color-line-strong: oklch(0.15 0.010 30);
-  --color-danger: oklch(0.55 0.200 25);
-  --color-warning: oklch(0.80 0.150 90);
-  --color-dark-bg: #0A0A0A;
-  --color-dark-surface: #141414;
-  --color-dark-ink: #FAFAFA;
-  --color-dark-line: #27272A;
-
-  /* Fonts — serif content voice + mono system voice. No single-sans. */
-  --font-sans: "MiSans", "Noto Serif SC", "Source Han Serif SC", "PingFang SC", "Microsoft YaHei", sans-serif;
-  --font-serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
-
-  /* Motion — exponential ease-out, silent stance. */
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --animate-dur-fast: 150ms;
-  --animate-dur-base: 250ms;
-  --animate-dur-slow: 500ms;
-
-  /* Radius — sharp editorial. */
-  --radius-card: 2px;
-  --radius-sm: 2px;
-  --radius: 2px;
-  --radius-lg: 4px;
-  --radius-xl: 6px;
-  --radius-pill: 9999px;
-  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  /* App 特有 / 覆盖包默认值 */
   --radius-input: 0px;
-}
-
-/* MiSans @font-face（v0.2.9 主字体：中文无衬线现代感） */
-@font-face {
-  font-family: 'MiSans';
-  src: url('https://cdn.jsdelivr.net/gh/dsrkafuu/misans@main/raw/Normal/woff2/MiSans-Regular.woff2') format('woff2');
-  font-weight: 400; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: 'MiSans';
-  src: url('https://cdn.jsdelivr.net/gh/dsrkafuu/misans@main/raw/Normal/woff2/MiSans-Medium.woff2') format('woff2');
-  font-weight: 500; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: 'MiSans';
-  src: url('https://cdn.jsdelivr.net/gh/dsrkafuu/misans@main/raw/Normal/woff2/MiSans-Semibold.woff2') format('woff2');
-  font-weight: 600; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: 'MiSans';
-  src: url('https://cdn.jsdelivr.net/gh/dsrkafuu/misans@main/raw/Normal/woff2/MiSans-Bold.woff2') format('woff2');
-  font-weight: 700; font-style: normal; font-display: swap;
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 

@@ -12,7 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@zmzai/theme": "^0.5.3",
+    "@zmzai/theme": "^0.6.0",
     "mongoose": "8.24.1",
     "next": "15.5.21",
     "react": "19.2.8",
