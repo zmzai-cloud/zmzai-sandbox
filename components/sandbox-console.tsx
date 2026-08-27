@@ -5,6 +5,32 @@ import { ModelSelector, Navbar, type ModelSelectorData, type ModelSelectorValue 
 import type { RunStatus, SandboxRun } from "@/lib/sandbox-types";
 
 type SessionUser = { id: string; name: string; email: string };
+type ArtifactItem = { path: string; bytes: number; contentType: string };
+type PreviewState = { path: string; text: string };
+
+const maxPreviewChars = 64_000;
+
+function previewable(contentType: string) {
+  return /^text\//.test(contentType) || /json|javascript|xml|csv|markdown|svg/.test(contentType);
+}
+
+function encodeArtifactPath(path: string) {
+  return path.split("/").map(encodeURIComponent).join("/");
+}
+
+function formatBytes(bytes: number) {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function formatDuration(from: string, to: string) {
+  const ms = Math.max(0, new Date(to).getTime() - new Date(from).getTime());
+  if (ms < 1_000) return `${ms}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`;
+}
 
 const statusLabels: Record<RunStatus, string> = {
   queued: "排队中",
@@ -47,8 +73,14 @@ export function SandboxConsole() {
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<PreviewState | null>(null);
 
   const selectedRun = useMemo(() => runs.find((run) => run.id === selectedId) ?? runs[0], [runs, selectedId]);
+  const artifactItems = useMemo<ArtifactItem[]>(() => {
+    if (!selectedRun) return [];
+    if (selectedRun.deliverables?.length) return selectedRun.deliverables.map(({ path, bytes, contentType }) => ({ path, bytes, contentType }));
+    return selectedRun.artifacts.map((path) => ({ path, bytes: 0, contentType: "" }));
+  }, [selectedRun]);
   const activeCount = runs.filter((run) => ["queued", "planning", "running", "cancellation_requested", "cleanup_pending"].includes(run.status)).length;
 
   const refreshRuns = useCallback(async () => {
@@ -137,11 +169,25 @@ export function SandboxConsole() {
   }
 
   async function cancelSelected() {
-    if (!selectedRun) return;
+    if (!selectedRun || selectedRun.archived) return;
     const response = await fetch(`/api/runs/${selectedRun.id}/cancel`, { method: "POST" });
     if (!response.ok) return;
     const data = (await response.json()) as { run: SandboxRun };
     setRuns((current) => current.map((run) => (run.id === data.run.id ? data.run : run)));
+  }
+
+  async function openPreview(item: ArtifactItem) {
+    if (!selectedRun) return;
+    const fallback = (text: string) => setPreview({ path: item.path, text });
+    try {
+      const response = await fetch(`/api/runs/${selectedRun.id}/artifacts/${encodeArtifactPath(item.path)}`);
+      if (!response.ok) return fallback("产物内容不可用（可能已随服务重启清理）");
+      const text = await response.text();
+      if (text.length > maxPreviewChars) return fallback(`${text.slice(0, maxPreviewChars)}\n…（预览已截断，完整内容请下载查看，共 ${formatBytes(text.length) || `${text.length} 字符`}）`);
+      setPreview({ path: item.path, text });
+    } catch {
+      fallback("产物内容读取失败");
+    }
   }
 
   return (
@@ -183,18 +229,20 @@ export function SandboxConsole() {
       <section className="runs-layout">
         <aside className="run-index">
           <div className="section-heading"><span className="eyebrow">02 · Runs</span><span className="run-count">{runs.length.toString().padStart(2, "0")}</span></div>
-          {runs.length === 0 ? <div className="empty-index">还没有运行。<br />从上面提交第一个任务。</div> : <div className="run-list">{runs.map((run) => <button key={run.id} className={`run-row ${selectedRun?.id === run.id ? "is-selected" : ""}`} onClick={() => setSelectedId(run.id)} type="button"><span className={`status-dot ${statusClass[run.status]}`} /><span className="run-row-copy"><span className="run-row-title">{run.task}</span><span className="run-row-meta">{formatDate(run.createdAt)} · {run.id}</span></span><span className={`status-label ${statusClass[run.status]}`}>{statusLabels[run.status]}</span></button>)}</div>}
+          {runs.length === 0 ? <div className="empty-index">还没有运行。<br />从上面提交第一个任务。</div> : <div className="run-list">{runs.map((run) => <button key={run.id} className={`run-row ${selectedRun?.id === run.id ? "is-selected" : ""}`} onClick={() => setSelectedId(run.id)} type="button"><span className={`status-dot ${statusClass[run.status]}`} /><span className="run-row-copy"><span className="run-row-title">{run.archived ? <span className="archived-tag">归档</span> : null}{run.task}</span><span className="run-row-meta">{formatDate(run.createdAt)} · {run.id}</span></span><span className={`status-label ${statusClass[run.status]}`}>{statusLabels[run.status]}</span></button>)}</div>}
         </aside>
 
         <article className="run-detail">
           {selectedRun ? <>
-            <div className="detail-heading"><div><p className="eyebrow">03 · Run detail</p><h2>{selectedRun.task}</h2><p className="detail-id">{selectedRun.id} · {selectedRun.provider === "demo" ? "演示 Provider" : "OpenSandbox"} · {selectedRun.model}</p></div><div className="detail-status"><span className={`status-label large ${statusClass[selectedRun.status]}`}>{statusLabels[selectedRun.status]}</span>{["queued", "running", "waiting_approval"].includes(selectedRun.status) ? <button className="btn-quiet" onClick={cancelSelected} type="button">取消运行</button> : null}</div></div>
-            <div className="detail-grid"><section className="detail-section"><div className="section-heading"><span className="eyebrow">事件流</span><span className="detail-time">{selectedRun.finishedAt ? `完成于 ${formatTime(selectedRun.finishedAt)}` : "正在监听"}</span></div><div className="event-stream" aria-live="polite">{selectedRun.events.map((item) => <div className="event-line" key={item.id}><time>{formatTime(item.at)}</time><span className={`event-kind event-${item.kind}`}>{item.kind}</span><span>{item.message}</span></div>)}</div></section><section className="detail-section artifact-section"><div className="section-heading"><span className="eyebrow">产物</span><span className="detail-time">{selectedRun.artifacts.length.toString().padStart(2, "0")}</span></div>{selectedRun.artifacts.length ? <ul className="artifact-list">{selectedRun.artifacts.map((artifact) => <li key={artifact}><span>↳</span>{artifact}</li>)}</ul> : <p className="empty-detail">运行完成后，产物会出现在这里。</p>}</section></div>
+            <div className="detail-heading"><div><p className="eyebrow">03 · Run detail</p><h2>{selectedRun.task}</h2><p className="detail-id">{selectedRun.id} · {selectedRun.provider === "demo" ? "演示 Provider" : "OpenSandbox"} · {selectedRun.model === "direct" ? `直接执行${selectedRun.command ? ` · ${selectedRun.command.program}` : ""}` : selectedRun.model}</p><div className="detail-metrics"><span>退出码 {selectedRun.exitCode ?? "—"}</span>{selectedRun.startedAt && selectedRun.finishedAt ? <span>耗时 {formatDuration(selectedRun.startedAt, selectedRun.finishedAt)}</span> : null}{selectedRun.archived ? <span className="archived-tag">已归档 · 只读</span> : null}</div></div><div className="detail-status"><span className={`status-label large ${statusClass[selectedRun.status]}`}>{statusLabels[selectedRun.status]}</span>{["queued", "running", "waiting_approval"].includes(selectedRun.status) && !selectedRun.archived ? <button className="btn-quiet" onClick={cancelSelected} type="button">取消运行</button> : null}</div></div>
+            <div className="detail-grid"><section className="detail-section"><div className="section-heading"><span className="eyebrow">事件流</span><span className="detail-time">{selectedRun.finishedAt ? `完成于 ${formatTime(selectedRun.finishedAt)}` : "正在监听"}</span></div><div className="event-stream" aria-live="polite">{selectedRun.events.map((item) => <div className="event-line" key={item.id}><time>{formatTime(item.at)}</time><span className={`event-kind event-${item.kind.replace(/\./g, "-")}`}>{item.kind}</span><span>{item.message}</span></div>)}</div></section><section className="detail-section artifact-section"><div className="section-heading"><span className="eyebrow">产物</span><span className="detail-time">{artifactItems.length.toString().padStart(2, "0")}</span></div>{artifactItems.length ? <ul className="artifact-list">{artifactItems.map((item) => <li className="artifact-row" key={item.path}><span className="artifact-bullet">↳</span><span className="artifact-name"><code>{item.path}</code>{item.bytes ? <small>{formatBytes(item.bytes)}</small> : null}</span>{selectedRun.archived ? null : <span className="artifact-actions">{previewable(item.contentType) ? <button className="btn-quiet" type="button" onClick={() => void openPreview(item)}>预览</button> : null}<a className="btn-quiet" href={`/api/runs/${selectedRun.id}/artifacts/${encodeArtifactPath(item.path)}?download=1`}>下载</a></span>}</li>)}</ul> : <p className="empty-detail">运行完成后，产物会出现在这里，可预览或下载。</p>}</section></div>
           </> : <div className="empty-detail empty-detail-large"><p className="eyebrow">等待第一个 Run</p><h2>沙箱还没有开始工作。</h2><p>提交一个任务，看看它如何在临时环境里读取、执行并交付结果。</p></div>}
         </article>
       </section>
 
       <footer className="console-footer"><span>Sandbox · ZMZAI OS execution layer</span><span>OpenSandbox adapter · Docker runtime</span></footer>
+
+      {preview ? <div className="artifact-overlay" role="dialog" aria-modal="true" aria-label={`产物预览 ${preview.path}`} onClick={() => setPreview(null)}><div className="artifact-preview" onClick={(event) => event.stopPropagation()}><div className="artifact-preview-head"><code>{preview.path}</code><button className="btn-quiet" type="button" onClick={() => setPreview(null)}>关闭</button></div><pre><code>{preview.text}</code></pre></div></div> : null}
     </main>
   );
 }

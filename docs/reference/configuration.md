@@ -17,6 +17,8 @@
 | `SANDBOX_AGENT_SERVICE_SECRET_CURRENT` | 无 | a.zmzai.cloud 调用内部 Agent API 的服务密钥；生产必须配置 |
 | `SANDBOX_AGENT_SERVICE_SECRET_PREVIOUS` | 空 | 轮换期间的旧服务密钥 |
 | `SANDBOX_AGENT_ALLOWED_PROGRAMS` | 内置白名单 | exec 工具允许的程序白名单（逗号分隔，覆盖默认列表） |
+| `SANDBOX_RUN_TTL_HOURS` | `24` | 控制台/开发者运行在 Mongo 中的归档保留时长（小时）。`0` 表示不持久化，仅保存在进程内存 |
+| `SANDBOX_MAX_PLAN_STEPS` | `3` | Agent 多轮规划的最大执行步数（1 到 8）；达到上限后由模型已有的输出作为最终结论 |
 
 ## 安全要求
 

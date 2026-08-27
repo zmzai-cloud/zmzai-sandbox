@@ -23,14 +23,21 @@ const SandboxSubmissionModel = (models.ZmzaiSandboxSubmission as Model<Submissio
 const capacitySchema = new Schema<CapacitySlot>({ slot: { type: Number, unique: true, required: true }, executionId: { type: String, index: true }, leaseExpiresAt: { type: Date, index: true } }, { strict: "throw" });
 const SandboxCapacityModel = (models.ZmzaiSandboxCapacity as Model<CapacitySlot> | undefined) ?? model<CapacitySlot>("ZmzaiSandboxCapacity", capacitySchema);
 const AgentSandboxSubmissionModel = (models.ZmzaiSandboxAgentSubmission as Model<AgentSubmission> | undefined) ?? model<AgentSubmission>("ZmzaiSandboxAgentSubmission", agentSubmissionSchema);
-const consumerTtlMs = 60 * 60 * 1000;
+// Consumer runs default to 24h retention; SANDBOX_RUN_TTL_HOURS overrides it
+// (0 disables Mongo persistence for consumer runs entirely — memory only).
+function consumerTtlMs() {
+  const hours = Number.parseFloat(process.env.SANDBOX_RUN_TTL_HOURS?.trim() ?? "");
+  if (!Number.isFinite(hours) || hours < 0) return 24 * 60 * 60 * 1000;
+  return hours * 60 * 60 * 1000;
+}
 // Agent runs must survive long enough for the Agent to reconcile after a
 // service restart; 7 days is the retention window.
 const agentTtlMs = 7 * 24 * 60 * 60 * 1000;
 
 export async function persistRun(run: SandboxRun) {
+  if (!run.taskRunId && consumerTtlMs() === 0) return;
   await connectMongo();
-  const ttlMs = run.taskRunId ? agentTtlMs : consumerTtlMs;
+  const ttlMs = run.taskRunId ? agentTtlMs : consumerTtlMs();
   await SandboxRunModel.updateOne({ runId: run.id }, { $set: { userId: run.userId, ownerSandboxKeyId: run.ownerSandboxKeyId, payload: run, expiresAt: new Date(Date.now() + ttlMs) } }, { upsert: true });
 }
 
@@ -139,6 +146,16 @@ export async function recoverExpiredExecutions(cleanup: (sandboxId: string) => P
 export async function activeRunCount(ownerSandboxKeyId?: string) {
   await connectMongo();
   return SandboxRunModel.countDocuments({ ...(ownerSandboxKeyId ? { ownerSandboxKeyId } : {}), "payload.status": { $in: ["queued", "running", "waiting_approval"] } });
+}
+
+/** Per-sandbox-key usage aggregated from the persisted run history. */
+export async function keyUsageStats(): Promise<Map<string, { runCount: number; lastRunAt: string | null }>> {
+  await connectMongo();
+  const rows = await SandboxRunModel.aggregate<{ _id: string; runCount: number; lastRunAt: Date | null }>([
+    { $match: { ownerSandboxKeyId: { $exists: true, $ne: null } } },
+    { $group: { _id: "$ownerSandboxKeyId", runCount: { $sum: 1 }, lastRunAt: { $max: "$createdAt" } } },
+  ]);
+  return new Map(rows.map((row) => [row._id, { runCount: row.runCount, lastRunAt: row.lastRunAt instanceof Date ? row.lastRunAt.toISOString() : null }]));
 }
 
 export async function activeAgentRunCount(userId?: string) {

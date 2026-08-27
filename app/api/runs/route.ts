@@ -1,15 +1,25 @@
 import { NextResponse } from "next/server";
 import { commandForAgent, imageForAgent, planTask } from "@/lib/agent-planner";
+import { recordDeliverables } from "@/lib/deliverables";
+import { persistedRuns } from "@/lib/persistent-runs";
 import { getRelayModels, getSessionUser } from "@/lib/relay-client";
-import { createRun, listRuns, updateRun } from "@/lib/sandbox-store";
-import { runOpenSandboxCommand } from "@/lib/opensandbox-provider";
+import type { SandboxRun } from "@/lib/sandbox-types";
+import { appendRunEvent, createRun, getRun, listRuns, updateRun } from "@/lib/sandbox-store";
+import { runAgentSandboxCommand } from "@/lib/opensandbox-provider";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   const user = await getSessionUser(request).catch(() => null);
   if (!user) return NextResponse.json({ error: "请先登录" }, { status: 401 });
-  return NextResponse.json({ runs: listRuns(user.id) });
+  const live = listRuns(user.id);
+  const liveIds = new Set(live.map((run) => run.id));
+  // Persisted history beyond the in-memory window is read-only ("archived"):
+  // artifact bytes live only in the process, so no downloads or cancellation.
+  const archived = await persistedRuns(user.id)
+    .then((runs) => runs.filter((run) => !liveIds.has(run.id)).map((run) => ({ ...run, archived: true }) as SandboxRun))
+    .catch(() => [] as SandboxRun[]);
+  return NextResponse.json({ runs: [...live, ...archived].sort((a, b) => b.createdAt.localeCompare(a.createdAt)) });
 }
 
 export async function POST(request: Request) {
@@ -40,13 +50,32 @@ export async function POST(request: Request) {
 }
 
 async function executeRun(request: Request, runId: string, model: string, task: string) {
+  const controller = new AbortController();
   try {
     const command = await planTask(request, model, task);
     updateRun(runId, "running", `Agent 已生成 ${command.language} 命令，正在启动隔离沙箱`);
-    const result = await runOpenSandboxCommand({ command: commandForAgent(command), image: imageForAgent(command), timeoutMs: command.timeoutMs });
-    for (const line of result.stdout) updateRun(runId, "running", line);
-    for (const line of result.stderr) updateRun(runId, "running", line);
-    updateRun(runId, result.exitCode === 0 ? "succeeded" : "failed", result.exitCode === 0 ? "沙箱执行完成，临时环境已清理" : "沙箱命令执行失败", result.exitCode);
+    const result = await runAgentSandboxCommand({
+      files: [],
+      program: "sh",
+      args: ["-c", commandForAgent(command)],
+      image: imageForAgent(command),
+      timeoutMs: command.timeoutMs,
+      signal: controller.signal,
+      onLine: (kind, text) => appendRunEvent(runId, kind, text),
+      collectArtifacts: true,
+      inputFiles: [],
+    });
+    if (controller.signal.aborted || getRun(runId)?.status === "cancelled") {
+      updateRun(runId, "cancelled", "沙箱执行已取消并清理");
+      return;
+    }
+    if (result.exitCode !== 0) {
+      updateRun(runId, "failed", `沙箱命令执行失败（退出码 ${result.exitCode}）`, result.exitCode);
+      return;
+    }
+    recordDeliverables(runId, result.artifacts);
+    if (result.artifacts.length) appendRunEvent(runId, "artifact", `产物 ${result.artifacts.length} 个：${result.artifacts.map((item) => item.path).join("、")}`, { artifacts: result.artifacts.map(({ content: _content, ...meta }) => meta) });
+    updateRun(runId, "succeeded", "沙箱执行完成，临时环境已清理", 0);
   } catch (error) {
     updateRun(runId, "failed", error instanceof Error ? error.message : "Agent 或沙箱执行失败", 1);
   }

@@ -59,6 +59,9 @@ export type SandboxRun = {
   /** Deliverables manifest produced by the run (metadata only; bytes are cached
    *  separately in the in-memory artifact store, never persisted to Mongo). */
   deliverables?: SandboxArtifactMeta[];
+  /** Set when a run is served from the Mongo archive instead of the live
+   *  in-process store (read-only: no cancel, no artifact bytes). */
+  archived?: boolean;
 };
 
 export type CreateRunInput = {

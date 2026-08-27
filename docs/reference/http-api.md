@@ -14,7 +14,37 @@ curl https://z.zmzai.cloud/api/v1/runs \
   -d '{"task":"计算 1+1 并输出结果","model":"<model-id>"}'
 ```
 
-`GET /api/v1/runs/:runId`、`GET /api/v1/runs/:runId/events` 和 `POST /api/v1/runs/:runId/cancel` 使用同一 `Authorization`。当前开发者预览将运行和幂等记录保存在进程内存中，服务重启后不保证保留；不要把它当作持久化 SDK 承诺。
+`GET /api/v1/runs/:runId`、`GET /api/v1/runs/:runId/events` 和 `POST /api/v1/runs/:runId/cancel` 使用同一 `Authorization`。运行与幂等记录持久化在 Mongo 中（默认保留 24 小时，`SANDBOX_RUN_TTL_HOURS` 可调），但运行事件和产物字节仍在进程内存中，服务重启后事件流不再可回放；不要把它当作持久化 SDK 承诺。
+
+### 多轮规划
+
+`sandbox_key` 提交的任务由 Agent 多轮执行：每轮规划一条命令并运行，stdout/stderr 作为观察回传给模型，由其决定继续执行（最多 `SANDBOX_MAX_PLAN_STEPS` 轮，默认 3）或给出最终结论。事件流中的 `sandbox.step` 事件标识每一步的进度；中途某步失败则整个运行立即终止，已产生的步骤事件保留。
+
+## `POST /api/v1/exec`
+
+直接在临时沙箱中执行一段代码，**不经过 LLM 规划**。适合确定性计算、数据处理等已经明确要跑什么代码的场景。
+
+请求：
+
+```json
+{
+  "language": "javascript | python | shell",
+  "code": "console.log(6 * 7)",
+  "timeoutMs": 30000,
+  "inputFiles": [{ "path": "data/input.csv", "content": "a,b\n1,2" }],
+  "limits": { "cpuMillis": 500, "memoryMiB": 512 }
+}
+```
+
+限制：`code` 1 到 12000 字符；`timeoutMs` 1000 到 60000（默认 30000）；`inputFiles` 最多 50 个文件、总量不超过 1 MiB，路径不允许绝对路径或 `..`；`limits.cpuMillis` 100 到 4000、`limits.memoryMiB` 128 到 2048。需要唯一的 `Idempotency-Key`（16 到 128 个可打印字符）。
+
+成功返回 `201` 和 `{ "run": ... }`，`run.model` 为 `"direct"`。查询、SSE 事件流和取消复用 `GET /api/v1/runs/:runId`、`GET /api/v1/runs/:runId/events`、`POST /api/v1/runs/:runId/cancel`。并发与幂等限制与 `POST /api/v1/runs` 相同。
+
+错误码：`SANDBOX_KEY_INVALID`（401）、`INVALID_BODY`（400）、`INVALID_IDEMPOTENCY_KEY`（400）、`IDEMPOTENCY_CONFLICT`（409）、`RATE_LIMITED`（429，附 `Retry-After`）。
+
+## `GET /api/v1/runs/:runId/artifacts/:path`
+
+下载运行产出的文件。`path` 必须出现在运行 `deliverables` 清单中；成功返回文件字节（`attachment`），`tooLarge` 的文件、字节已随服务重启清理或路径不在清单中时返回 `404`。
 
 ## `GET /api/session`
 
@@ -73,11 +103,11 @@ curl https://z.zmzai.cloud/api/v1/runs \
 
 ## `GET /api/runs`
 
-返回当前登录用户的运行列表。运行记录目前保存在 Sandbox 进程内存中，服务重启后会消失。
+返回当前登录用户的运行列表：进程内存中的活跃运行 + Mongo 归档历史（`archived: true`，只读——产物字节与事件已随进程清理，不支持取消），按 `createdAt` 倒序合并去重。归档保留时长由 `SANDBOX_RUN_TTL_HOURS` 控制。
 
 ## `GET /api/runs/:runId`
 
-返回属于当前用户的单次运行。不存在或不属于当前用户时返回 `404`。
+返回属于当前用户的单次运行。内存未命中时回退到 Mongo 归档（`archived: true`，只读）。不存在或不属于当前用户时返回 `404`。
 
 ## `GET /api/runs/:runId/events`
 

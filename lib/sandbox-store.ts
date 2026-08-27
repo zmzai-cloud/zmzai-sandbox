@@ -46,7 +46,10 @@ export function createRun(input: CreateRunInput & Partial<Pick<CreateAgentRunInp
     provider: process.env.OPEN_SANDBOX_URL ? "opensandbox" : "demo",
     events: [event(1, "system", "任务已进入沙箱队列")],
     artifacts: [],
-    ...(input.taskRunId ? { taskRunId: input.taskRunId, requestId: input.requestId, snapshot: input.snapshot, command: input.command, limits: input.limits } : {}),
+    ...(input.taskRunId ? { taskRunId: input.taskRunId, requestId: input.requestId } : {}),
+    ...(input.snapshot ? { snapshot: input.snapshot } : {}),
+    ...(input.command ? { command: input.command } : {}),
+    ...(input.limits ? { limits: input.limits } : {}),
   };
   runs.set(run.id, run);
   void persistRun(run).catch((error) => console.error("persist sandbox run", error));

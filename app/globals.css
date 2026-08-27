@@ -537,6 +537,38 @@
     color: #d6bf79;
   }
 
+  .event-stderr,
+  .event-sandbox-failed {
+    color: #e08a84;
+  }
+
+  .event-system {
+    color: color-mix(in oklch, var(--color-surface) 62%, transparent);
+  }
+
+  .detail-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.9rem;
+    margin-top: 0.55rem;
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+  }
+
+  .archived-tag {
+    display: inline-block;
+    margin-right: 0.4rem;
+    border: 1px solid var(--color-line);
+    padding: 0.05rem 0.35rem;
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
   .artifact-section {
     border-left: 1px solid var(--color-line);
     padding-left: 1.25rem;
@@ -555,13 +587,82 @@
 
   .artifact-list li {
     display: flex;
-    gap: 0.45rem;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
     border-bottom: 1px solid var(--color-line);
     padding-bottom: 0.65rem;
   }
 
-  .artifact-list li span {
+  .artifact-bullet {
     color: var(--color-accent);
+    flex: 0 0 auto;
+  }
+
+  .artifact-name {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .artifact-name code {
+    overflow-wrap: anywhere;
+  }
+
+  .artifact-name small {
+    color: var(--color-muted);
+    font-size: 0.6rem;
+  }
+
+  .artifact-actions {
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: 0.9rem;
+  }
+
+  .artifact-actions .btn-quiet {
+    border-bottom: 0;
+    padding: 0;
+  }
+
+  .artifact-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: grid;
+    place-items: center;
+    padding: 2rem;
+    background: color-mix(in oklch, var(--color-ink) 55%, transparent);
+  }
+
+  .artifact-preview {
+    display: flex;
+    width: min(100%, 52rem);
+    max-height: min(80vh, 48rem);
+    flex-direction: column;
+    background: var(--color-paper);
+    border: 1px solid var(--color-line);
+  }
+
+  .artifact-preview-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border-bottom: 1px solid var(--color-line);
+    padding: 0.8rem 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+  }
+
+  .artifact-preview pre {
+    flex: 1;
+    margin: 0;
+    overflow: auto;
+    padding: 1rem;
+    font-size: 0.72rem;
+    line-height: 1.6;
   }
 
   .empty-detail-large {
