@@ -1,5 +1,5 @@
 type RelayUser = { id: string; name: string; email: string; role: string };
-export type RelayModel = { model: string; maxInputTokens?: number; maxOutputTokens?: number; allowedReasoningEfforts?: string[] };
+export type RelayModel = { model: string; maxInputTokens?: number; maxOutputTokens?: number; allowedReasoningEfforts?: string[]; availableChannels?: number };
 
 const authUrl = () => (process.env.AUTH_URL?.trim() || "https://auth.zmzai.cloud").replace(/\/$/, "");
 const relayUrl = () => (process.env.RELAY_URL?.trim() || "https://m.zmzai.cloud/api/v1").replace(/\/$/, "");

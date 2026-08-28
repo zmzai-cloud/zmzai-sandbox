@@ -43,6 +43,12 @@ export async function POST(request: Request) {
   if (!availableModels.some((item) => item.model === model)) {
     return NextResponse.json({ error: "所选模型不可用，请重新加载模型目录" }, { status: 400 });
   }
+  // 提前拦截：目标模型当前没有任何启用且未冷却的上游渠道时，任务进队列后规划必然失败，
+  // 直接拒绝并提示，而不是让用户等到运行中才看到「所有上游渠道均不可用」。
+  const selected = availableModels.find((item) => item.model === model);
+  if (selected && (selected.availableChannels ?? 1) === 0) {
+    return NextResponse.json({ error: "该模型的上游渠道当前都不可用，请更换模型或稍后重试" }, { status: 400 });
+  }
   const run = createRun({ task, model, userId: user.id });
   updateRun(run.id, "running", `已登录为 ${user.name}，正在请求 Agent 规划命令`);
   void executeRun(request, run.id, model, task);
