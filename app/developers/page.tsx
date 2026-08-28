@@ -1,7 +1,6 @@
-import { DeveloperWorkbench } from "@/components/developer-workbench";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "开发者工作台 · ZMZAI Sandbox", description: "创建 sandbox_key 并接入 ZMZAI Sandbox Runner" };
-
+// 开发者工作台已拆分为 /keys 与 /docs，旧链接保持可达
 export default function DevelopersPage() {
-  return <DeveloperWorkbench />;
+  redirect("/keys");
 }

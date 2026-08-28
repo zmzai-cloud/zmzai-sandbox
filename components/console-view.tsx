@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ModelSelector, Navbar, type ModelSelectorData, type ModelSelectorValue } from "@zmzai/theme";
+import { ModelSelector, type ModelSelectorData, type ModelSelectorValue } from "@zmzai/theme";
 import type { RunStatus, SandboxRun } from "@/lib/sandbox-types";
 
 type SessionUser = { id: string; name: string; email: string };
@@ -62,7 +62,12 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 }
 
-export function SandboxConsole() {
+/**
+ * 执行区主体。mode="task"：提交表单 + 最新运行详情；mode="history"：运行列表 + 详情。
+ * initialRunId：历史页由 ?run= 传入的初始选中（见 RunsHistoryView）。
+ * 外壳由 SandboxShell（theme AppShell）提供，这里只渲染内容区。
+ */
+export function ConsoleView({ mode, initialRunId }: { mode: "task" | "history"; initialRunId?: string | null }) {
   const [runs, setRuns] = useState<SandboxRun[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [task, setTask] = useState("");
@@ -81,7 +86,6 @@ export function SandboxConsole() {
     if (selectedRun.deliverables?.length) return selectedRun.deliverables.map(({ path, bytes, contentType }) => ({ path, bytes, contentType }));
     return selectedRun.artifacts.map((path) => ({ path, bytes: 0, contentType: "" }));
   }, [selectedRun]);
-  const activeCount = runs.filter((run) => ["queued", "planning", "running", "cancellation_requested", "cleanup_pending"].includes(run.status)).length;
 
   const refreshRuns = useCallback(async () => {
     const response = await fetch("/api/runs", { cache: "no-store" });
@@ -122,6 +126,12 @@ export function SandboxConsole() {
     })();
     return () => { cancelled = true; };
   }, [refreshRuns]);
+
+  // 历史页：支持 ⌘K / 列表外链直达某次运行
+  useEffect(() => {
+    if (mode !== "history" || !initialRunId) return;
+    setSelectedId(initialRunId);
+  }, [mode, initialRunId]);
 
   useEffect(() => {
     if (!selectedRun || !["queued", "running", "waiting_approval"].includes(selectedRun.status)) return;
@@ -190,59 +200,54 @@ export function SandboxConsole() {
     }
   }
 
+  const runIndex = (
+    <aside className="run-index">
+      <div className="section-heading"><span className="eyebrow">02 · Runs</span><span className="run-count">{runs.length.toString().padStart(2, "0")}</span></div>
+      {runs.length === 0 ? <div className="empty-index">还没有运行。<br />从「任务」页提交第一个任务。</div> : <div className="run-list">{runs.map((run) => <button key={run.id} className={`run-row ${selectedRun?.id === run.id ? "is-selected" : ""}`} onClick={() => setSelectedId(run.id)} type="button"><span className={`status-dot ${statusClass[run.status]}`} /><span className="run-row-copy"><span className="run-row-title">{run.archived ? <span className="archived-tag">归档</span> : null}{run.task}</span><span className="run-row-meta">{formatDate(run.createdAt)} · {run.id}</span></span><span className={`status-label ${statusClass[run.status]}`}>{statusLabels[run.status]}</span></button>)}</div>}
+    </aside>
+  );
+
+  const runDetail = (
+    <article className="run-detail">
+      {selectedRun ? <>
+        <div className="detail-heading"><div><p className="eyebrow">03 · Run detail</p><h2>{selectedRun.task}</h2><p className="detail-id">{selectedRun.id} · {selectedRun.provider === "demo" ? "演示 Provider" : "OpenSandbox"} · {selectedRun.model === "direct" ? `直接执行${selectedRun.command ? ` · ${selectedRun.command.program}` : ""}` : selectedRun.model}</p><div className="detail-metrics"><span>退出码 {selectedRun.exitCode ?? "—"}</span>{selectedRun.startedAt && selectedRun.finishedAt ? <span>耗时 {formatDuration(selectedRun.startedAt, selectedRun.finishedAt)}</span> : null}{selectedRun.archived ? <span className="archived-tag">已归档 · 只读</span> : null}</div></div><div className="detail-status"><span className={`status-label large ${statusClass[selectedRun.status]}`}>{statusLabels[selectedRun.status]}</span>{["queued", "running", "waiting_approval"].includes(selectedRun.status) && !selectedRun.archived ? <button className="btn-quiet" onClick={cancelSelected} type="button">取消运行</button> : null}</div></div>
+        <div className="detail-grid"><section className="detail-section"><div className="section-heading"><span className="eyebrow">事件流</span><span className="detail-time">{selectedRun.finishedAt ? `完成于 ${formatTime(selectedRun.finishedAt)}` : "正在监听"}</span></div><div className="event-stream" aria-live="polite">{selectedRun.events.map((item) => <div className="event-line" key={item.id}><time>{formatTime(item.at)}</time><span className={`event-kind event-${item.kind.replace(/\./g, "-")}`}>{item.kind}</span><span>{item.message}</span></div>)}</div></section><section className="detail-section artifact-section"><div className="section-heading"><span className="eyebrow">产物</span><span className="detail-time">{artifactItems.length.toString().padStart(2, "0")}</span></div>{artifactItems.length ? <ul className="artifact-list">{artifactItems.map((item) => <li className="artifact-row" key={item.path}><span className="artifact-bullet">↳</span><span className="artifact-name"><code>{item.path}</code>{item.bytes ? <small>{formatBytes(item.bytes)}</small> : null}</span>{selectedRun.archived ? null : <span className="artifact-actions">{previewable(item.contentType) ? <button className="btn-quiet" type="button" onClick={() => void openPreview(item)}>预览</button> : null}<a className="btn-quiet" href={`/api/runs/${selectedRun.id}/artifacts/${encodeArtifactPath(item.path)}?download=1`}>下载</a></span>}</li>)}</ul> : <p className="empty-detail">运行完成后，产物会出现在这里，可预览或下载。</p>}</section></div>
+      </> : <div className="empty-detail empty-detail-large"><p className="eyebrow">等待第一个 Run</p><h2>沙箱还没有开始工作。</h2><p>提交一个任务，看看它如何在临时环境里读取、执行并交付结果。</p></div>}
+    </article>
+  );
+
   return (
-    <main className="console-shell">
-      <Navbar
-        sublabel="sandbox"
-        brandHref="/"
-        badge={<span className="rounded-full border border-line px-2 py-0.5 font-mono text-[11px] text-ink-3">z.zmzai.cloud</span>}
-        actions={
-          <>
-            <span className="flex items-center gap-1.5 text-xs text-ink-2"><span className="connection-dot" />{user ? user.name : isLoadingSession ? "正在检查登录" : "未登录"}</span>
-            <span className="font-mono text-xs text-ink-3">并发 {activeCount}/1</span>
-            <a className="text-xs text-ink-2 transition-colors hover:text-accent" href="/developers">开发者文档</a>
-            {!user && !isLoadingSession ? <a className="text-xs text-accent-readable underline underline-offset-4" href={`https://auth.zmzai.cloud/login?next=${encodeURIComponent("https://z.zmzai.cloud/")}`}>登录</a> : null}
-          </>
-        }
-      >
-        <h1 className="text-sm font-semibold">Sandbox</h1>
-      </Navbar>
+    <>
+      {mode === "task" ? (
+        <>
+          <section className="console-intro">
+            <div><p className="eyebrow">执行控制台</p><h2>让代码先在边界里跑起来。</h2></div>
+            <p className="intro-copy">每次运行都从一个临时 Workspace 快照开始。日志、退出码和产物会被完整留下，正式文件不会被沙箱直接改写。</p>
+          </section>
 
-      <section className="console-intro">
-        <div><p className="eyebrow">执行控制台</p><h2>让代码先在边界里跑起来。</h2></div>
-        <p className="intro-copy">每次运行都从一个临时 Workspace 快照开始。日志、退出码和产物会被完整留下，正式文件不会被沙箱直接改写。</p>
-      </section>
+          <section className="run-composer">
+            <div className="composer-label"><span className="section-index">01</span><span>新建运行</span></div>
+            <form onSubmit={submitRun} className="composer-form">
+              <label className="sr-only" htmlFor="task">任务描述</label>
+              <textarea id="task" value={task} onChange={(event) => setTask(event.target.value)} placeholder="例如：读取当前 Workspace 的资料，整理成 Markdown 报告并保存。" rows={3} />
+              <div className="composer-actions">
+                <label className="model-select"><span>模型</span><ModelSelector data={modelSelectorData ?? { featured: [], channels: [] }} value={modelValue} onChange={setModelValue} placeholder={isLoadingSession ? "检查登录…" : "选择模型"} /></label>
+                <button className="btn-primary" disabled={isSubmitting || !user || !model} type="submit">{isSubmitting ? "创建中…" : "开始运行 →"}</button>
+              </div>
+              {error ? <p className="form-error">{error}</p> : null}
+            </form>
+          </section>
 
-      <section className="run-composer">
-        <div className="composer-label"><span className="section-index">01</span><span>新建运行</span></div>
-        <form onSubmit={submitRun} className="composer-form">
-          <label className="sr-only" htmlFor="task">任务描述</label>
-          <textarea id="task" value={task} onChange={(event) => setTask(event.target.value)} placeholder="例如：读取当前 Workspace 的资料，整理成 Markdown 报告并保存。" rows={3} />
-          <div className="composer-actions">
-            <label className="model-select"><span>模型</span><ModelSelector data={modelSelectorData ?? { featured: [], channels: [] }} value={modelValue} onChange={setModelValue} placeholder={isLoadingSession ? "检查登录…" : "选择模型"} /></label>
-            <button className="btn-primary" disabled={isSubmitting || !user || !model} type="submit">{isSubmitting ? "创建中…" : "开始运行 →"}</button>
-          </div>
-          {error ? <p className="form-error">{error}</p> : null}
-        </form>
-      </section>
-
-      <section className="runs-layout">
-        <aside className="run-index">
-          <div className="section-heading"><span className="eyebrow">02 · Runs</span><span className="run-count">{runs.length.toString().padStart(2, "0")}</span></div>
-          {runs.length === 0 ? <div className="empty-index">还没有运行。<br />从上面提交第一个任务。</div> : <div className="run-list">{runs.map((run) => <button key={run.id} className={`run-row ${selectedRun?.id === run.id ? "is-selected" : ""}`} onClick={() => setSelectedId(run.id)} type="button"><span className={`status-dot ${statusClass[run.status]}`} /><span className="run-row-copy"><span className="run-row-title">{run.archived ? <span className="archived-tag">归档</span> : null}{run.task}</span><span className="run-row-meta">{formatDate(run.createdAt)} · {run.id}</span></span><span className={`status-label ${statusClass[run.status]}`}>{statusLabels[run.status]}</span></button>)}</div>}
-        </aside>
-
-        <article className="run-detail">
-          {selectedRun ? <>
-            <div className="detail-heading"><div><p className="eyebrow">03 · Run detail</p><h2>{selectedRun.task}</h2><p className="detail-id">{selectedRun.id} · {selectedRun.provider === "demo" ? "演示 Provider" : "OpenSandbox"} · {selectedRun.model === "direct" ? `直接执行${selectedRun.command ? ` · ${selectedRun.command.program}` : ""}` : selectedRun.model}</p><div className="detail-metrics"><span>退出码 {selectedRun.exitCode ?? "—"}</span>{selectedRun.startedAt && selectedRun.finishedAt ? <span>耗时 {formatDuration(selectedRun.startedAt, selectedRun.finishedAt)}</span> : null}{selectedRun.archived ? <span className="archived-tag">已归档 · 只读</span> : null}</div></div><div className="detail-status"><span className={`status-label large ${statusClass[selectedRun.status]}`}>{statusLabels[selectedRun.status]}</span>{["queued", "running", "waiting_approval"].includes(selectedRun.status) && !selectedRun.archived ? <button className="btn-quiet" onClick={cancelSelected} type="button">取消运行</button> : null}</div></div>
-            <div className="detail-grid"><section className="detail-section"><div className="section-heading"><span className="eyebrow">事件流</span><span className="detail-time">{selectedRun.finishedAt ? `完成于 ${formatTime(selectedRun.finishedAt)}` : "正在监听"}</span></div><div className="event-stream" aria-live="polite">{selectedRun.events.map((item) => <div className="event-line" key={item.id}><time>{formatTime(item.at)}</time><span className={`event-kind event-${item.kind.replace(/\./g, "-")}`}>{item.kind}</span><span>{item.message}</span></div>)}</div></section><section className="detail-section artifact-section"><div className="section-heading"><span className="eyebrow">产物</span><span className="detail-time">{artifactItems.length.toString().padStart(2, "0")}</span></div>{artifactItems.length ? <ul className="artifact-list">{artifactItems.map((item) => <li className="artifact-row" key={item.path}><span className="artifact-bullet">↳</span><span className="artifact-name"><code>{item.path}</code>{item.bytes ? <small>{formatBytes(item.bytes)}</small> : null}</span>{selectedRun.archived ? null : <span className="artifact-actions">{previewable(item.contentType) ? <button className="btn-quiet" type="button" onClick={() => void openPreview(item)}>预览</button> : null}<a className="btn-quiet" href={`/api/runs/${selectedRun.id}/artifacts/${encodeArtifactPath(item.path)}?download=1`}>下载</a></span>}</li>)}</ul> : <p className="empty-detail">运行完成后，产物会出现在这里，可预览或下载。</p>}</section></div>
-          </> : <div className="empty-detail empty-detail-large"><p className="eyebrow">等待第一个 Run</p><h2>沙箱还没有开始工作。</h2><p>提交一个任务，看看它如何在临时环境里读取、执行并交付结果。</p></div>}
-        </article>
-      </section>
-
-      <footer className="console-footer"><span>Sandbox · ZMZAI OS execution layer</span><span>OpenSandbox adapter · Docker runtime</span></footer>
+          <div className="console-task">{runDetail}</div>
+        </>
+      ) : (
+        <section className="runs-layout">
+          {runIndex}
+          {runDetail}
+        </section>
+      )}
 
       {preview ? <div className="artifact-overlay" role="dialog" aria-modal="true" aria-label={`产物预览 ${preview.path}`} onClick={() => setPreview(null)}><div className="artifact-preview" onClick={(event) => event.stopPropagation()}><div className="artifact-preview-head"><code>{preview.path}</code><button className="btn-quiet" type="button" onClick={() => setPreview(null)}>关闭</button></div><pre><code>{preview.text}</code></pre></div></div> : null}
-    </main>
+    </>
   );
 }

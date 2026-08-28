@@ -1,5 +1,10 @@
-import { SandboxConsole } from "@/components/sandbox-console";
+import { ConsoleView } from "@/components/console-view";
+import { SandboxShell } from "@/components/sandbox-shell";
 
 export default function HomePage() {
-  return <SandboxConsole />;
+  return (
+    <SandboxShell>
+      <ConsoleView mode="task" />
+    </SandboxShell>
+  );
 }

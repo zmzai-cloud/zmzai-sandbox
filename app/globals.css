@@ -351,6 +351,11 @@
     padding: 1.5rem 0 2rem 2rem;
   }
 
+  /* 任务页单栏展示详情：去掉双栏布局预留的左侧间距 */
+  .console-task .run-detail {
+    padding-left: 0;
+  }
+
   .section-heading {
     justify-content: space-between;
     gap: 1rem;
