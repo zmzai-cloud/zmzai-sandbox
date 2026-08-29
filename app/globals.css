@@ -3,12 +3,12 @@
 @import "@zmzai/theme/fonts";
 @source "../node_modules/@zmzai/theme/src/**/*.{ts,tsx}";
 
-/* zmzai cloud 牧之 — tokens 统一来自 @zmzai/theme（v0.6.0 起纯白+荧光绿，
-   与 zmzai.cloud 主应用同源），不再内联。仅保留 app 特有 token。 */
+/* zmzai cloud 牧之 — tokens 统一来自 @zmzai/theme（v0.8.1 墨骨：
+   墨黑结构 + 绿色语义），不再内联。仅保留 app 特有 token。 */
 
 @theme {
   /* App 特有 / 覆盖包默认值 */
-  --radius-input: 0px;
+  --radius-input: 3px;
   --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
