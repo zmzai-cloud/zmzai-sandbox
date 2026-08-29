@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@zmzai/contracts": "github:zmzai-cloud/zmzai-contracts#main",
     "@zmzai/theme": "^0.8.1",
     "mongoose": "8.24.1",
     "next": "15.5.21",
