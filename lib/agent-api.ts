@@ -131,6 +131,6 @@ export async function idempotentAgentRun(input: CreateAgentRunInput): Promise<{ 
   return { run, replayed: false };
 }
 
-export function startAgentExecution(runId: string, replayed: boolean) {
-  if (!replayed) executeAgentSandboxRun(runId);
+export function startAgentExecution(runId: string, replayed: boolean, traceId?: string | null) {
+  if (!replayed) executeAgentSandboxRun(runId, traceId);
 }

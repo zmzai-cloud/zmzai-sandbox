@@ -11,6 +11,7 @@ function forwardedHeaders(request: Request, extra?: HeadersInit) {
   const cookie = request.headers.get("cookie");
   if (cookie) headers.set("cookie", cookie);
   headers.set("accept", "application/json");
+  // TODO(telemetry): 浏览器会话链路的 x-trace-id 透传（agent→sandbox 内部 run 链已覆盖）
   return headers;
 }
 

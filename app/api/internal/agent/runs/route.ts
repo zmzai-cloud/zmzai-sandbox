@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     const concurrency = result.status === 429;
     return NextResponse.json({ code: result.code, error: result.error }, { status: result.status, headers: concurrency ? { "Retry-After": "15" } : undefined });
   }
-  startAgentExecution(result.run.id, result.replayed);
+  startAgentExecution(result.run.id, result.replayed, request.headers.get("x-trace-id"));
   return NextResponse.json({ run: result.run }, { status: 201, headers: { "Cache-Control": "no-store" } });
 }
 

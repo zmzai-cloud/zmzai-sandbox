@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { setRunArtifacts } from "@/lib/artifact-store";
 import { deleteOpenSandbox, runAgentSandboxCommand } from "@/lib/opensandbox-provider";
 import { appendRunEvent, createRun, getRun, setRunDeliverables, setRunProviderSandbox, updateRun } from "@/lib/sandbox-store";
+import { runBindTrace, runEndSpan } from "@/lib/telemetry";
 import type { CreateAgentRunInput, SandboxArtifactData } from "@/lib/sandbox-types";
 
 const globalExecutions = globalThis as typeof globalThis & { __zmzaiAgentSandboxExecutions?: Map<string, AbortController> };
@@ -40,12 +41,15 @@ function recordDeliverables(runId: string, artifacts: SandboxArtifactData[]): vo
  * With no OPEN_SANDBOX_URL configured the provider is "demo" and the run is
  * simulated so the agent integration can be developed end-to-end locally.
  */
-export async function executeAgentRun(runId: string): Promise<void> {
+export async function executeAgentRun(runId: string, traceId?: string | null): Promise<void> {
   const run = getRun(runId);
   if (!run) return;
+  // 埋点：绑定 run 的 trace（agent 入口透传或新生成）；终态时发 span.closed（内部吞错，绝不影响执行）
+  runBindTrace(runId, traceId);
   const input = run.taskRunId && run.requestId && run.snapshot && run.command ? { userId: run.userId, taskRunId: run.taskRunId, requestId: run.requestId, snapshot: run.snapshot, command: run.command, limits: run.limits } : null;
   if (!input) {
     updateRun(runId, "failed", "内部运行缺少执行参数");
+    runEndSpan(runId, "error");
     return;
   }
   try {
@@ -74,6 +78,7 @@ export async function executeAgentRun(runId: string): Promise<void> {
       const manifest = [{ path: demoArtifact.path, bytes: demoArtifact.bytes, contentType: demoArtifact.contentType, sha256: demoArtifact.sha256, tooLarge: false }];
       appendRunEvent(runId, "sandbox.completed", "Demo Sandbox 执行完成（未连接 OpenSandbox，未真实运行）", { artifacts: manifest });
       updateRun(runId, "succeeded", "Demo Sandbox 执行完成", 0);
+      runEndSpan(runId, "ok", 0);
       return;
     }
     const limits = {
@@ -108,14 +113,17 @@ export async function executeAgentRun(runId: string): Promise<void> {
     if (cancellationRequested) {
       appendRunEvent(runId, "sandbox.failed", "执行已取消并清理");
       updateRun(runId, "cancelled", "沙箱执行已取消并清理");
+      runEndSpan(runId, "error");
     } else if (result.exitCode === 0) {
       recordDeliverables(runId, result.artifacts);
       const manifest = result.artifacts.map(({ content: _content, ...meta }) => meta);
       appendRunEvent(runId, "sandbox.completed", `执行完成，退出码 ${result.exitCode}，临时环境已清理`, { artifacts: manifest });
       updateRun(runId, "succeeded", "沙箱执行完成，临时环境已清理", result.exitCode);
+      runEndSpan(runId, "ok", result.exitCode);
     } else {
       appendRunEvent(runId, "sandbox.failed", `命令以退出码 ${result.exitCode} 结束`);
       updateRun(runId, "failed", `沙箱命令执行失败（退出码 ${result.exitCode}）`, result.exitCode);
+      runEndSpan(runId, "error", result.exitCode);
     }
   } catch (error) {
     const status = getRun(runId)?.status;
@@ -123,10 +131,12 @@ export async function executeAgentRun(runId: string): Promise<void> {
     if (cancelled) {
       appendRunEvent(runId, "sandbox.failed", "执行已取消并清理");
       updateRun(runId, "cancelled", "沙箱执行已取消并清理");
+      runEndSpan(runId, "error");
     } else {
       const message = error instanceof Error ? error.message : "Agent 或沙箱执行失败";
       appendRunEvent(runId, "sandbox.failed", message);
       updateRun(runId, "failed", message, 1);
+      runEndSpan(runId, "error", 1);
     }
   } finally {
     // Artifact bytes intentionally stay cached (in-memory) so the Agent can
@@ -137,10 +147,10 @@ export async function executeAgentRun(runId: string): Promise<void> {
   }
 }
 
-export function executeAgentSandboxRun(runId: string) {
+export function executeAgentSandboxRun(runId: string, traceId?: string | null) {
   const controller = new AbortController();
   executions.set(runId, controller);
-  void executeAgentRun(runId);
+  void executeAgentRun(runId, traceId);
 }
 
 export function abortAgentRun(runId: string) {

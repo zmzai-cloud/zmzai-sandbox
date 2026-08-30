@@ -7,5 +7,5 @@ const rootDirectory = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   resolve: { alias: { "@": rootDirectory } },
-  test: { environment: "node" },
+  test: { environment: "node", server: { deps: { inline: ["@zmzai/contracts"] } } },
 });
