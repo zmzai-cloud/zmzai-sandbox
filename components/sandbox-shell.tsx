@@ -107,7 +107,7 @@ export function SandboxShell({ children }: { children: ReactNode }) {
 
   return (
     <ThemeAppShell
-      brand={{ label: "sandbox", suffix: "· z.zmzai.cloud", href: "/" }}
+      brand={{ label: "Plate", suffix: "· z.zmzai.cloud", href: "/" }}
       sections={sections}
       pathname={pathname}
       link={Link}
