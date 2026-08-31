@@ -12,8 +12,8 @@ importers:
         specifier: github:zmzai-cloud/zmzai-contracts#main
         version: https://codeload.github.com/zmzai-cloud/zmzai-contracts/tar.gz/c5c150c6f6d3636a191049e463a87c5a27ac35c5(zod@3.25.76)
       '@zmzai/theme':
-        specifier: ^0.9.7
-        version: 0.9.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(tailwindcss@4.3.3)
+        specifier: ^0.9.10
+        version: 0.9.10(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(tailwindcss@4.3.3)
       mongoose:
         specifier: 8.24.1
         version: 8.24.1
@@ -928,8 +928,8 @@ packages:
     peerDependencies:
       zod: ^3.25.0
 
-  '@zmzai/theme@0.9.7':
-    resolution: {integrity: sha512-RUPugpIbC4k+QNJUDVophqaKHualyAzJ7RV/s9dF0QbE1sd6pphmJBHh9CfOTGHke9Z4B99JU7wmyxxnm7lmLA==}
+  '@zmzai/theme@0.9.10':
+    resolution: {integrity: sha512-23yyd49Lh6EEjxSRLZGfwV2ybjcIFJvqcYATGRcKXP4dcVteNfwdpz6oM0kLlX8nK9dAaZNOhvq0oWmN/loyvQ==}
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
@@ -2576,7 +2576,7 @@ snapshots:
     dependencies:
       zod: 3.25.76
 
-  '@zmzai/theme@0.9.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(tailwindcss@4.3.3)':
+  '@zmzai/theme@0.9.10(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(tailwindcss@4.3.3)':
     dependencies:
       '@radix-ui/react-dialog': 1.1.23(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@radix-ui/react-dropdown-menu': 2.1.24(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
